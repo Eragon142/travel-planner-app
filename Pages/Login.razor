@@ -1,0 +1,33 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject NavigationManager Nav
+
+<div class="auth-card login-card">
+    <div class="auth-logo">✈</div>
+    <span class="eyebrow">Travel Planner</span>
+    <h1>Witaj ponownie</h1>
+    <p class="muted">Zaloguj się, aby przejść do panelu planowania podróży.</p>
+    <div class="demo-box">Demo: <b>demo@travel.pl</b> / <b>Demo123!</b></div>
+    @if (Error) { <div class="alert danger">Nieprawidłowy adres e-mail lub hasło.</div> }
+    @if (!string.IsNullOrWhiteSpace(Locked)) { <div class="alert danger">Konto zablokowane. Spróbuj po @Locked.</div> }
+    <form method="post" action="/api/auth/login" class="form">
+        <label>E-mail</label>
+        <input name="email" type="email" required placeholder="np. demo@travel.pl" />
+        <label>Hasło</label>
+        <input name="password" type="password" required minlength="6" placeholder="Wpisz hasło" />
+        <button class="primary full" type="submit">Zaloguj się</button>
+    </form>
+    <a class="auth-link" href="/reset-password">Nie pamiętasz hasła?</a>
+</div>
+
+@code {
+    bool Error => Nav.ToAbsoluteUri(Nav.Uri).Query.Contains("error=1");
+    string? Locked
+    {
+        get
+        {
+            var q = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
+            return q.TryGetValue("locked", out var v) ? v.ToString() : null;
+        }
+    }
+}

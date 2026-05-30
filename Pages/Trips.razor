@@ -1,0 +1,56 @@
+@page "/trips"
+@attribute [Authorize]
+@using System.Security.Claims
+@inject AppDbContext Db
+@inject AuthenticationStateProvider Auth
+@inject NavigationManager Nav
+
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Planowanie</span>
+        <h1>Moje podróże</h1>
+        <p class="muted">Dodawaj nowe wyjazdy i przechodź do szczegółów planowania.</p>
+    </div>
+</div>
+
+<div class="grid two">
+    <EditForm Model="newTrip" OnValidSubmit="CreateTrip" class="card form">
+        <DataAnnotationsValidator />
+        <h2>Dodaj podróż</h2>
+        <label>Nazwa</label><InputText @bind-Value="newTrip.Name" placeholder="np. Wakacje w Rzymie" />
+        <label>Cel</label><InputText @bind-Value="newTrip.Destination" placeholder="np. Rzym, Włochy" />
+        <label>Data rozpoczęcia</label><InputDate @bind-Value="newTrip.StartDate" />
+        <label>Data zakończenia</label><InputDate @bind-Value="newTrip.EndDate" />
+        @if(!string.IsNullOrEmpty(formError)){<div class="alert danger">@formError</div>}
+        <button class="primary">Zapisz podróż</button>
+    </EditForm>
+    <div class="card">
+        <h2>Nadchodzące plany</h2>
+        @if(trips.Count == 0){<p class="muted">Brak podróży.</p>}
+        @foreach(var trip in trips)
+        {
+            <div class="trip-row">
+                <div class="clickable" @onclick="() => OpenTrip(trip.Id)">
+                    <b>@trip.Name</b><br />
+                    <span>@trip.Destination · @trip.StartDate.ToString("dd.MM.yyyy") - @trip.EndDate.ToString("dd.MM.yyyy")</span>
+                </div>
+                <button class="ghost danger-text" @onclick="() => AskDelete(trip)">🗑 Usuń</button>
+            </div>
+        }
+    </div>
+</div>
+@if(deleteTrip != null)
+{
+    <div class="modal"><div class="modal-box"><h3>Usunąć podróż?</h3><p>@deleteTrip.Name</p><button class="danger" @onclick="ConfirmDelete">Usuń</button><button @onclick="() => deleteTrip=null">Anuluj</button></div></div>
+}
+
+@code{
+    List<Trip> trips = new(); Trip newTrip = new(); Trip? deleteTrip; string? formError; int userId;
+    protected override async Task OnInitializedAsync(){ userId=await CurrentUserId(); await Load(); }
+    async Task<int> CurrentUserId(){ var s=await Auth.GetAuthenticationStateAsync(); return int.Parse(s.User.FindFirstValue(ClaimTypes.NameIdentifier)!); }
+    async Task Load(){ trips = await Db.Trips.Include(t=>t.TripUsers).Where(t=>t.TripUsers.Any(u=>u.UserId==userId)).OrderBy(t=>t.StartDate).ToListAsync(); }
+    async Task CreateTrip(){ formError=null; if(newTrip.EndDate < newTrip.StartDate){formError="Data zakończenia nie może być wcześniejsza niż data rozpoczęcia."; return;} newTrip.TripUsers.Add(new TripUser{UserId=userId, Role=TripRole.Owner}); Db.Trips.Add(newTrip); await Db.SaveChangesAsync(); newTrip=new Trip(); await Load(); }
+    void OpenTrip(int id) => Nav.NavigateTo($"/trips/{id}");
+    void AskDelete(Trip t)=>deleteTrip=t;
+    async Task ConfirmDelete(){ if(deleteTrip!=null){ deleteTrip.IsDeleted=true; await Db.SaveChangesAsync(); deleteTrip=null; await Load(); } }
+}

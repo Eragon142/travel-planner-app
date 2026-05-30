@@ -1,0 +1,32 @@
+@page "/settings"
+@attribute [Authorize]
+@using System.Security.Claims
+@inject AppDbContext Db
+@inject AuthenticationStateProvider Auth
+
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Profil</span>
+        <h1>Ustawienia</h1>
+        <p class="muted">Zarządzaj preferencjami aplikacji i powiadomieniami.</p>
+    </div>
+</div>
+
+<div class="card narrow settings-card">
+    <label class="row-between switch-row">
+        <span>
+            <b>Powiadomienia o podróży</b>
+            <small>Przypomnienie 24h przed rozpoczęciem wyjazdu</small>
+        </span>
+        <input type="checkbox" @bind="enabled" />
+    </label>
+    <button class="primary" @onclick="Save">Zapisz ustawienia</button>
+    @if(saved){<div class="alert success">Ustawienia zapisane.</div>}
+</div>
+
+@code{
+    bool enabled; bool saved;
+    protected override async Task OnInitializedAsync(){ var u=await CurrentUser(); enabled=u?.PushNotificationsEnabled ?? true; }
+    async Task<AppUser?> CurrentUser(){ var s=await Auth.GetAuthenticationStateAsync(); var id=s.User.FindFirstValue(ClaimTypes.NameIdentifier); return int.TryParse(id,out var uid)? await Db.Users.FindAsync(uid): null; }
+    async Task Save(){ var u=await CurrentUser(); if(u!=null){u.PushNotificationsEnabled=enabled; await Db.SaveChangesAsync(); saved=true;} }
+}
