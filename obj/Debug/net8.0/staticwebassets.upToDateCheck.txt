@@ -1,2 +1,3 @@
+wwwroot\css\.Rhistory
 wwwroot\css\app.css
 wwwroot\js\map.js

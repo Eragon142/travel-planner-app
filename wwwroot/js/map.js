@@ -1,4 +1,4 @@
-let map;
+﻿let map;
 let markers = new Map();
 let currentDotNetHelper = null;
 
@@ -195,41 +195,10 @@ function escapeHtml(text) {
 window.flyToLocation = (lat, lng) => {
     if (map) {
         map.flyTo([lat, lng], 15, {
-            duration: 1.5 
-        });
-    }
-};
-
-window.getCurrentPosition = () => {
-    return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-            reject(new Error("Geolokalizacja nie jest wspierana"));
-            return;
-        }
-        
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                resolve({
-                    Latitude: position.coords.latitude,
-                    Longitude: position.coords.longitude
-                });
-            },
-            (error) => {
-                reject(new Error(error.message));
-            }
-        );
-    });
-};
-
-
-window.flyToLocation = (lat, lng) => {
-    if (map) {
-        map.flyTo([lat, lng], 15, {
             duration: 1.5
         });
     }
 };
-
 window.getCurrentPosition = () => {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {

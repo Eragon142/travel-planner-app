@@ -1,25 +1,27 @@
 {
   "format": 1,
   "restore": {
-    "/Users/amanda/Desktop/travelapp/travel-planner-app/TravelPlannerApp.csproj": {}
+    "C:\\Users\\jakub\\Documents\\GitHub\\travel-planner-app\\TravelPlannerApp.csproj": {}
   },
   "projects": {
-    "/Users/amanda/Desktop/travelapp/travel-planner-app/TravelPlannerApp.csproj": {
+    "C:\\Users\\jakub\\Documents\\GitHub\\travel-planner-app\\TravelPlannerApp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/amanda/Desktop/travelapp/travel-planner-app/TravelPlannerApp.csproj",
+        "projectUniqueName": "C:\\Users\\jakub\\Documents\\GitHub\\travel-planner-app\\TravelPlannerApp.csproj",
         "projectName": "TravelPlannerApp",
-        "projectPath": "/Users/amanda/Desktop/travelapp/travel-planner-app/TravelPlannerApp.csproj",
-        "packagesPath": "/Users/amanda/.nuget/packages/",
-        "outputPath": "/Users/amanda/Desktop/travelapp/travel-planner-app/obj/",
+        "projectPath": "C:\\Users\\jakub\\Documents\\GitHub\\travel-planner-app\\TravelPlannerApp.csproj",
+        "packagesPath": "C:\\Users\\jakub\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\jakub\\Documents\\GitHub\\travel-planner-app\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/Users/amanda/.nuget/NuGet/NuGet.Config"
+          "C:\\Users\\jakub\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -38,12 +40,16 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.100"
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "Microsoft.CodeAnalysis.Analyzers": {
+              "target": "Package",
+              "version": "[3.3.4, )"
+            },
             "Microsoft.EntityFrameworkCore.Sqlite": {
               "target": "Package",
               "version": "[8.0.8, )"
@@ -64,20 +70,6 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Host.osx-arm64",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.AspNetCore.App": {
               "privateAssets": "none"
@@ -86,7 +78,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.100/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.313/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

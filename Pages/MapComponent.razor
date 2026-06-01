@@ -1,9 +1,10 @@
-@using Microsoft.JSInterop
+﻿@using Microsoft.JSInterop
 @using Microsoft.EntityFrameworkCore
 @using TravelPlannerApp.Models
 @using TravelPlannerApp.Data
 @inject IJSRuntime JS
 @inject AppDbContext Db
+@implements IDisposable
 
 <div id="map" style="height: 500px; width: 100%; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
 
@@ -22,13 +23,13 @@
         {
             try
             {
-                // Sprawdź czy Leaflet jest załadowany, jeśli nie - załaduj dynamicznie
+
                 var isLeafletLoaded = await JS.InvokeAsync<bool>("checkLeafletLoaded");
                 if (!isLeafletLoaded)
                 {
                     Console.WriteLine("Leaflet not loaded, loading dynamically...");
                     await JS.InvokeVoidAsync("loadLeaflet");
-                    await Task.Delay(500); // Daj czas na załadowanie
+                    await Task.Delay(500); 
                 }
                 
                 objRef = DotNetObjectReference.Create(this);
@@ -49,7 +50,7 @@
     [JSInvokable]
     public async Task OnMapClick(double lat, double lng)
     {
-        // Zapytaj o nazwę przed dodaniem
+
         var nazwa = await JS.InvokeAsync<string>("prompt", "Podaj nazwę punktu:", "Nowe miejsce");
         if (string.IsNullOrWhiteSpace(nazwa))
             return;
@@ -129,5 +130,9 @@
         {
             await OnEditPoint.InvokeAsync(point);
         }
+    }
+    public void Dispose()
+    {
+        objRef?.Dispose();
     }
 }

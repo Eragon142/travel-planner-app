@@ -1,10 +1,11 @@
-@page "/trips/{TripId:int}"
+﻿@page "/trips/{TripId:int}"
 @attribute [Authorize]
 @using System.Security.Claims
 @using System.Text.Json
 @using Microsoft.JSInterop
 @using Microsoft.AspNetCore.Components.Web
 @using TravelPlannerApp.Pages
+@using TravelPlannerApp.Services
 @inject AppDbContext Db
 @inject AuthenticationStateProvider Auth
 @inject IWebHostEnvironment Env
@@ -59,6 +60,8 @@ else
     private bool isSearching = false;
     private string searchAddress = "";
     private string searchMessage = "";
+    private string? documentMessage;
+    private string? photoMessage;
 
     protected override async Task OnInitializedAsync()
     { 
@@ -260,7 +263,7 @@ else
         StateHasChanged();
     }
 
-    private async Task OpenEditForm(LocationPoint point)
+    private Task OpenEditForm(LocationPoint point)
     {
         editingPoint = new LocationPoint
         {
@@ -274,6 +277,7 @@ else
         };
         showEditForm = true;
         StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private async Task SaveEditedPoint()
@@ -311,37 +315,49 @@ else
     async Task UploadDocs(InputFileChangeEventArgs e){ await UploadFiles(e, true); }
     async Task UploadPhotos(InputFileChangeEventArgs e){ await UploadFiles(e, false); }
     
-    async Task UploadFiles(InputFileChangeEventArgs e, bool pdf)
+   async Task UploadFiles(InputFileChangeEventArgs e, bool pdf)
     {
-        message = null;
+        // Rozdzielone wiadomości zależnie od zakładki
+        if (pdf) documentMessage = null;
+        else photoMessage = null;
+        
         var added = 0;
         var allowedPhotoExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
 
         foreach (var file in e.GetMultipleFiles(10))
         {
+            // Nowa walidacja - Magic Bytes (upewnij się, że dodałeś klasę FileValidator)
+            if (!FileValidator.IsValidFile(file))
+            {
+                var msg = "Nieprawidłowy format lub plik jest uszkodzony.";
+                if (pdf) documentMessage = msg; else photoMessage = msg;
+                continue;
+            }
+
             var extension = Path.GetExtension(file.Name).ToLowerInvariant();
 
             if (pdf && extension != ".pdf")
             {
-                message = "Do dokumentów można dodać tylko PDF.";
+                documentMessage = "Do dokumentów można dodać tylko PDF.";
                 continue;
             }
 
             if (pdf && file.Size > 10 * 1024 * 1024)
             {
-                message = "PDF jest większy niż 10 MB.";
+                documentMessage = "PDF jest większy niż 10 MB.";
                 continue;
             }
 
             if (!pdf && !allowedPhotoExtensions.Contains(extension))
             {
-                message = "Galeria przyjmuje tylko zdjęcia JPG, PNG, GIF albo WEBP.";
+                photoMessage = "Galeria przyjmuje tylko zdjęcia JPG, PNG, GIF albo WEBP.";
                 continue;
             }
 
             if (StorageUsed() + file.Size > 500 * 1024 * 1024)
             {
-                message = "Przekroczono limit 500 MB na podróż.";
+                var msg = "Przekroczono limit 500 MB na podróż.";
+                if (pdf) documentMessage = msg; else photoMessage = msg;
                 continue;
             }
 
@@ -383,7 +399,13 @@ else
         }
 
         await Db.SaveChangesAsync();
-        if (added > 0) message = pdf ? "Dokument został zapisany." : "Zdjęcie zostało zapisane.";
+        
+        if (added > 0) 
+        {
+            if (pdf) documentMessage = "Dokument został zapisany.";
+            else photoMessage = "Zdjęcie zostało zapisane.";
+        }
+        
         await Load();
     }
     
@@ -392,9 +414,94 @@ else
     async Task DeleteLocation(LocationPoint l){ Db.Locations.Remove(l); await Db.SaveChangesAsync(); await Load(); }
     async Task AddPackingItem(){ var list=trip!.PackingLists.FirstOrDefault(); if(list==null){list=new PackingList{TripId=TripId,Name="Lista pakowania"}; Db.PackingLists.Add(list); await Db.SaveChangesAsync();} item.PackingListId=list.Id; item.UpdatedAt=DateTime.Now; Db.PackingItems.Add(item); await Db.SaveChangesAsync(); item=new(); await Load(); }
     async Task TogglePacked(PackingItem i){ i.IsPacked=!i.IsPacked; i.UpdatedAt=DateTime.Now; await Db.SaveChangesAsync(); await Load(); }
+   
     async Task DeleteItem(PackingItem i){ Db.PackingItems.Remove(i); await Db.SaveChangesAsync(); await Load(); }
-    async Task AddCollaborator(){ var user=await Db.Users.FirstOrDefaultAsync(u=>u.Email==collaboratorEmail); if(user==null){message="Użytkownik o tym e-mailu nie istnieje."; return;} if(!trip!.TripUsers.Any(t=>t.UserId==user.Id)){Db.TripUsers.Add(new TripUser{TripId=TripId,UserId=user.Id,Role=TripRole.Collaborator}); await Db.SaveChangesAsync();} collaboratorEmail=""; await Load(); }
-    async Task RemoveCollaborator(TripUser tu){ Db.TripUsers.Remove(tu); await Db.SaveChangesAsync(); await Load(); }
+    async Task AddCollaborator()
+    {
+        var currentUserRole = trip!.TripUsers.FirstOrDefault(u => u.UserId == userId)?.Role;
+        if (currentUserRole != TripRole.Owner)
+        {
+            message = "Tylko wlasciciel moze dodawac osoby.";
+            return;
+        }
+
+        var user = await Db.Users.FirstOrDefaultAsync(u => u.Email == collaboratorEmail);
+        if (user == null)
+        {
+            message = "Użytkownik o tym e-mailu nie istnieje.";
+            return;
+        }
+        
+        if (!trip!.TripUsers.Any(t => t.UserId == user.Id))
+        {
+            Db.TripUsers.Add(new TripUser { TripId = TripId, UserId = user.Id, Role = TripRole.Collaborator });
+            await Db.SaveChangesAsync();
+        }
+        
+        collaboratorEmail = "";
+        await Load();
+    }
+
+    async Task DeleteDocument(DocumentFile doc)
+    {
+        documentMessage = null;
+        try
+        {
+            if (File.Exists(doc.StoredPath))
+            {
+                File.Delete(doc.StoredPath);
+            }
+
+            Db.Documents.Remove(doc);
+            await Db.SaveChangesAsync();
+
+            documentMessage = "Dokument został usunięty.";
+            await Load();
+        }
+        catch (Exception)
+        {
+            documentMessage = "Wystąpił błąd podczas usuwania dokumentu.";
+        }
+    }
+
+    async Task DeletePhoto(PhotoFile photo)
+    {
+        photoMessage = null;
+        try
+        {
+            var physicalPath = Path.Combine(Env.WebRootPath, photo.StoredPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+
+            if (File.Exists(physicalPath))
+            {
+                File.Delete(physicalPath);
+            }
+
+            Db.Photos.Remove(photo);
+            await Db.SaveChangesAsync();
+
+            photoMessage = "Zdjęcie zostało usunięte.";
+            await Load();
+        }
+        catch (Exception)
+        {
+            photoMessage = "Wystąpił błąd podczas usuwania zdjęcia.";
+        }
+    }
+
+    async Task RemoveCollaborator(TripUser tu)
+    {
+        var currentUserRole = trip!.TripUsers.FirstOrDefault(u => u.UserId == userId)?.Role;
+        if (currentUserRole != TripRole.Owner)
+        {
+            message = "Tylko właściciel moze usuwać osoby.";
+            return;
+        }
+
+        Db.TripUsers.Remove(tu);
+        await Db.SaveChangesAsync();
+        await Load();
+    }
+
 
     public class GeoLocation
     {
@@ -412,8 +519,8 @@ else
     }
 
     RenderFragment BudgetTab()=>@<div class="grid two"><div class="card form"><h2>Ustaw budżet</h2><label>Kwota</label><InputNumber @bind-Value="trip!.BudgetAmount"/><label>Waluta</label><InputSelect @bind-Value="trip!.BudgetCurrency"><option>PLN</option><option>EUR</option><option>USD</option><option>GBP</option></InputSelect><button class="primary" @onclick="SaveBudget">Ustaw budżet</button></div><EditForm Model="expense" OnValidSubmit="AddExpense" class="card form"><DataAnnotationsValidator/><h2>Dodaj wydatek</h2><label>Kwota</label><InputNumber @bind-Value="expense.Amount"/><label>Waluta</label><InputSelect @bind-Value="expense.Currency"><option>PLN</option><option>EUR</option><option>USD</option></InputSelect><label>Kategoria</label><InputText @bind-Value="expense.Category"/><label>Opis</label><InputText @bind-Value="expense.Description"/><label>Data</label><InputDate @bind-Value="expense.Date"/><button class="primary">Dodaj koszt</button></EditForm><div class="card wide"><h2>Wydatki</h2>@foreach(var e in trip!.Expenses.OrderByDescending(e=>e.Date)){<div class="trip-row"><span>@e.Date.ToString("dd.MM") · @e.Category · @e.Description</span><b>@e.Amount @e.Currency</b></div>}</div></div>;
-    RenderFragment DocumentsTab()=>@<div class="card"><h2>Dokumenty PDF</h2><InputFile OnChange="UploadDocs" multiple accept="application/pdf"/>@if(!trip!.Documents.Any()){<p class="muted">Brak dokumentów.</p>}@foreach(var d in trip.Documents){<div class="trip-row"><span>@d.FileName <small>@d.UploadedAt.ToString("dd.MM.yyyy")</small></span><span><a target="_blank" href="/api/documents/@d.Id">Podgląd</a> · <a href="/api/documents/@d.Id" download>Pobierz</a></span></div>}@if(message!=null){<div class="alert danger">@message</div>}</div>;
-    RenderFragment PhotosTab()=>@<div class="card"><h2>Galeria zdjęć</h2><InputFile OnChange="UploadPhotos" multiple accept="image/*"/><div class="gallery">@foreach(var p in trip!.Photos){<a href="@p.StoredPath" target="_blank"><img src="@p.StoredPath" title="@p.FileName" /></a>}</div></div>;
+    RenderFragment DocumentsTab() => @<div class="card"><h2>Dokumenty PDF</h2><InputFile OnChange="UploadDocs" multiple accept="application/pdf" />@if(!string.IsNullOrEmpty(documentMessage)){<p class="alert success">@documentMessage</p>}@if(trip!.Documents.Any()){<div>@foreach(var d in trip!.Documents){<div class="document-row"><span>📄 @d.FileName</span><button class="ghost danger-text" @onclick="() => DeleteDocument(d)">Usuń</button></div>}</div>}</div>;    
+    RenderFragment PhotosTab() => @<div class="card"><h2>Galeria zdjęć</h2><InputFile OnChange="UploadPhotos" multiple accept="image/*"/>@if(!string.IsNullOrEmpty(photoMessage)){<p class="alert success">@photoMessage</p>}<div class="gallery">@foreach(var p in trip!.Photos){<div class="photo-card" style="position:relative; display:inline-block;"><img src="@p.StoredPath" alt="@p.FileName" /><button class="danger" style="position:absolute; bottom:10px; right:10px;" @onclick="() => DeletePhoto(p)">Usuń</button></div>}</div></div>;
     
     RenderFragment MapTab() => @<div class="card" style="font-family: inherit;">
     <h2 style="margin-bottom: 20px;">🗺️ Mapa atrakcji</h2>
@@ -589,5 +696,27 @@ else
 </div>;
 
     RenderFragment PackingTab()=>@<div class="card"><h2>Lista pakowania</h2>@{var list=trip!.PackingLists.FirstOrDefault(); var items=list?.Items.ToList() ?? new List<PackingItem>(); var progress=items.Count==0?0:(int)(100.0*items.Count(i=>i.IsPacked)/items.Count);}<div class="progress"><span style="width:@progress%"></span></div><p>@progress% spakowane</p><EditForm Model="item" OnValidSubmit="AddPackingItem" class="inline-form"><InputText @bind-Value="item.Name" placeholder="Przedmiot"/><InputNumber @bind-Value="item.Quantity"/><button class="primary">Dodaj</button></EditForm>@foreach(var i in items){<div class="trip-row packing-item"><label class="@(i.IsPacked?"packed":"")"><input type="checkbox" checked="@i.IsPacked" @onchange="()=>TogglePacked(i)"/> <span>@i.Name</span> <span class="qty-badge">@(i.Quantity <= 1 ? "1 szt." : $"{i.Quantity} szt.")</span></label><button class="ghost danger-text" @onclick="()=>DeleteItem(i)">Usuń</button></div>}@if(list!=null){<a class="button" href="/api/packing/@list.Id/export">Eksportuj do PDF</a>}</div>;
-    RenderFragment UsersTab()=>@<div class="card form narrow"><h2>Współużytkownicy</h2><InputText @bind-Value="collaboratorEmail" placeholder="email osoby"/><button class="primary" @onclick="AddCollaborator">Dodaj</button>@foreach(var u in trip!.TripUsers){<div class="trip-row"><span>@u.User.Email (@u.Role)</span>@if(u.Role==TripRole.Collaborator){<button class="ghost danger-text" @onclick="()=>RemoveCollaborator(u)">Usuń</button>}</div>}</div>;
-}
+    RenderFragment UsersTab() => @<div class="card form narrow">
+        <h2>Współużytkownicy</h2>
+        @{
+            var currentUserRole = trip!.TripUsers.FirstOrDefault(u => u.UserId == userId)?.Role;
+        }
+
+        @if(currentUserRole == TripRole.Owner)
+        {
+            <InputText @bind-Value="collaboratorEmail" placeholder="email osoby"/>
+            <button class="primary" @onclick="AddCollaborator">Dodaj</button>
+        }
+
+        @foreach(var u in trip!.TripUsers)
+        {
+            <div class="trip-row">
+                <span>@u.User.Email (@u.Role)</span>
+                @if(currentUserRole == TripRole.Owner && u.Role == TripRole.Collaborator)
+                {
+                    <button class="ghost danger-text" @onclick="()=>RemoveCollaborator(u)">Usun</button>
+                }
+            </div>
+        }
+    </div>;
+    }

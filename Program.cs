@@ -1,11 +1,11 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using TravelPlannerApp.Data;
 using TravelPlannerApp.Models;
 using TravelPlannerApp.Services;
-
+using TravelPlannerApp; 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
@@ -58,6 +58,6 @@ app.MapGet("/api/packing/{id:int}/export", async (int id, AppDbContext db, PdfEx
 }).RequireAuthorization();
 
 app.MapBlazorHub();
-app.MapFallbackToPage("/_Host");
+app.MapRazorPages();
 await SeedData.InitializeAsync(app.Services);
 app.Run();
